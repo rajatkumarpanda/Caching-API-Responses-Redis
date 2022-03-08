@@ -5,6 +5,11 @@ from iex import IEXStock
 from helpers import format_number
 from datetime import datetime
 from json.decoder import JSONDecodeError
+from redis import Redis
+import json
+from datetime import timedelta
+
+redis_client = Redis(host='localhost', port=6379, db=0)
 
 symbol = st.sidebar.text_input("Symbol", value="MSFT")
 
@@ -20,9 +25,25 @@ st.title(screen)
 if screen == "Overview":
     
     try:
-        logo = stock.get_logo()
-        company_info = stock.get_company_info()
+        logo_key = f"{symbol}_logo"
+        logo =  redis_client.get(logo_key)
 
+        if logo is None:
+            logo = stock.get_logo()
+            redis_client.set(f'{symbol}_logo',json.dumps(logo))
+        else:
+            logo = json.loads(logo)
+
+        company_key = f"{symbol}_desc"
+        company_info = redis_client.get(company_key)
+
+        if company_info is None:
+            company_info = stock.get_company_info()
+            redis_client.set(company_key, json.dumps(company_info))
+            redis_client.expire(company_key, timedelta(seconds=30))
+        else:
+            company_info = json.loads(company_info)
+            
         col1, col2 = st.columns([1,4])
 
         with col1:
